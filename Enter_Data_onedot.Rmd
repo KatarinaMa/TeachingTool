@@ -1,0 +1,140 @@
+---
+title: ""
+runtime: shiny
+output: html_document
+---
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+library(shiny)
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(rsconnect)
+library(reshape2)
+library(shinythemes)
+library(shinyjs)
+library(DBI)
+library(RMySQL)
+library(sqldf)
+library(odbc)
+library(sqldf)
+library(httr)
+library(shinyalert)
+library(mailR)
+
+
+ui <- fluidPage(useShinyjs(),useShinyalert(),
+             tags$style(type = "text/css",
+             ".label {  font-size: 50px;}"),
+  column(12, 
+          selectInput("Column2", label = "1) Please choose your sex",
+                            choices = list("Male" = 1, "Female" = 2),
+                            selected = 1)),
+  
+   column(12,
+             sliderInput("Column3", label = "2) Please choose your height", min = 130,
+                          max = 220, step = 0.5, value = 165)),
+  
+   column(12,
+             sliderInput("Column5", label = "3) Please choose the height of your father", min = 130, 
+        max = 220, step = 0.5, value = 165)),
+  
+  column(12,
+             sliderInput("Column6", label = "4) Please choose the height of your mother",
+                         min = 130,max = 220, step = 0.5, value = 165)),
+
+  column(12,
+               selectInput("Column7", label = "5) How many glasses of milk do you drink per week (including milk in coffees etc.)?",
+                            choices = list("0" = 0, "1-2" = 1 , "3-5" = 2,  "6-9" = 3, "10+" = 4),
+                            selected = 0)),
+   column(12,
+          
+          
+          sliderInput("Column8", label = "6) What is your shoe size (european)?", min = 20, 
+          max = 50 , step = 1, value = 35)),
+  
+ column(12,
+        actionButton('addSQL', 'Add your data to the data set'))
+
+ 
+ )
+
+server <- function(input, output,session) { 
+  
+values <- reactiveValues(df = NULL)
+
+observeEvent(input$addSQL, {
+    if(input$addSQL > 0 ) {
+   newrow <- data.frame(   
+                           Study = "Current",
+                           Sex = input$Column2,
+                           Height_self = input$Column3,
+                           Height_father = input$Column5,
+                           Height_mother = input$Column6,
+                           Milk = input$Column7,
+                           Shoe_size = input$Column8)
+     values$df <<- newrow
+    }
+  })
+  
+
+addSQL <- 
+      observeEvent(input$addSQL,{
+        if(input$addSQL > 0) {
+      conn <- dbConnect(
+      drv = RMySQL::MySQL(),
+      dbname = "******",
+      host = "sql2.freemysqlhosting.net",
+      username = "******",
+      password = "******")
+
+      dataset <-  values$df
+      dbWriteTable(con=conn, name = "heighttool", value = dataset, row.names=FALSE, append=TRUE)
+      dbDisconnect(conn)
+      
+      }
+})
+
+observeEvent(input$addSQL, {
+
+    if(input$addSQL > 0 ) {
+     shinyalert(
+    title = "",
+    text = "Your data was submitted to the dataset. You can now go back to the webpage",
+    closeOnEsc = TRUE,
+    closeOnClickOutside = FALSE,
+    html = FALSE,
+    type = "success",
+    showConfirmButton = TRUE,
+    showCancelButton = FALSE,
+    confirmButtonText = "OK",
+    confirmButtonCol = "#AEDEF4",
+    timer = 0,
+    imageUrl = "",
+    animation = FALSE
+  )
+    }
+  })
+
+
+observeEvent(input$addSQL, {
+     if(input$addSQL > 0 ) {
+      from <- "heighttool@gmail.com"
+to <- "heighttool@gmail.com"
+send.mail(from = from,
+          to = to,
+          subject = "New entry heighttool",
+          body = "New entry heighttool",
+          smtp = list(host.name = "smtp.gmail.com", port = 465, 
+                      user.name = "heighttool@gmail.com",            
+                      passwd = "******", ssl = TRUE),
+          authenticate = TRUE,
+          send = TRUE)
+}
+})
+
+}
+shinyApp(ui = ui, server = server,options = list(height = 1000))
+```
+
+
