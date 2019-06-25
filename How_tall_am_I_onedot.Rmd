@@ -1,0 +1,274 @@
+---
+title: ""
+runtime: shiny
+output: html_document
+---
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+library(shiny)
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(rsconnect)
+library(reshape2)
+library(shinythemes)
+library(shinyjs)
+library(DBI)
+library(RMySQL)
+library(sqldf)
+library(odbc)
+library(sqldf)
+library(httr)
+library(shinyalert)
+library(shinyTable)
+
+
+size <- 18
+size_axis_title <- 18
+size_strip_text <- 18
+size_title <- 18
+
+ui <- fluidPage(
+ h4(column(12, 
+          selectInput("Sex", label = "Please choose your sex",
+                            choices = list("Male" = 1, "Female" = 2),
+                            selected = 1))),
+ h4(column(12,
+             sliderInput("Height", label = "Please choose your height", min = 130,
+                          max = 220, step = 1, value = 165))),
+ column(4,
+      h4(plotOutput('histogram_modern')) 
+    ),
+ column(4,
+      h4(plotOutput('histogram_historisch'))   
+    ),
+ column(4,
+      h4(plotOutput('histogram_historisch_leer'))   
+    ),
+ column(8,
+       h4(htmlOutput("textPercentile"))
+    ),
+ column(8,
+ h4(uiOutput("linkheight"))
+),
+column(8,
+ h4(htmlOutput("textRef"))
+))
+  
+server <- function(input, output,session) { 
+
+data_modern1  <- reactive({
+conn <- dbConnect(
+      drv = RMySQL::MySQL(),
+      dbname = "******",
+      host = "sql2.freemysqlhosting.net",
+      username = "******",
+      password = "******")
+on.exit(dbDisconnect(conn), add = TRUE)
+sql <- "SELECT * FROM Beide_modern"
+query <- sqlInterpolate(conn, sql)
+data_modern1 <- dbGetQuery(conn, query)
+ })
+
+
+data_modern <- reactive({
+  data_modern <- data_modern1()
+  data_modern$Sex <- as.factor(data_modern$Sex)
+  return(data_modern)
+})
+
+
+data_historisch1 <- reactive({
+conn <- dbConnect(
+      drv = RMySQL::MySQL(),
+      dbname = "******",
+      host = "sql2.freemysqlhosting.net",
+      username = "******",
+      password = "******")
+on.exit(dbDisconnect(conn), add = TRUE)
+sql <- "SELECT * FROM Beide_historisch"
+query <- sqlInterpolate(conn, sql)
+data_historisch1  <- dbGetQuery(conn, query)
+ })
+
+
+data_historisch <- reactive({
+  data_historisch <- data_historisch1()
+  data_historisch$Sex <- as.factor(data_historisch$Sex)
+  return(data_historisch)
+})
+
+
+dataModern <- reactive({
+ if (input$Sex == "1") {
+ dataModern <- data_modern()[data_modern()$Sex=="1",]
+ }
+  else {
+dataModern <- data_modern()[data_modern()$Sex=="2",]
+    }
+ return(dataModern)
+ })
+
+dataHistorisch <- reactive({
+ if (input$Sex == "1") {
+ dataHistorisch <- data_historisch()[data_historisch()$Sex=="1",]
+ }
+  else {
+dataHistorisch<- data_historisch()[data_historisch()$Sex=="2",]
+    }
+ return(dataHistorisch)
+ })
+
+
+colorsex <- reactive({
+ if (input$Sex == "1") {
+ colorsex <- "#00A9FF"
+ }
+  else {
+colorsex <-"#F8766D"
+    }
+ return(colorsex)
+ })
+
+namesex <- reactive({
+ if (input$Sex == "1") {
+ namesex <- "male students"
+ }
+  else {
+namesex <-"women"
+    }
+ return(namesex)
+ })
+
+
+meanMod <- reactive ({
+meanMod <- round(mean(dataModern()$Height))
+ return(meanMod)
+})
+
+meanHist <- reactive ({
+ meanHist <- round(mean(dataHistorisch()$Height))
+ return(meanHist)
+})
+
+
+
+output$histogram_modern<- renderPlot({
+ggplot()+
+  geom_histogram(data=dataModern(), aes(x=Height),alpha = 0.5,position="identity",color="darkgrey",fill = colorsex(),binwidth=1)+
+  geom_vline(aes(xintercept = input$Height, linetype="Your height"),col="#32CD32",size=2)+
+  xlab("Height in cm")+
+  ylab("Count") +
+  ggtitle("Histogram height today") +
+  scale_linetype_manual(name = "", values = c("Your height" = "solid"))+
+  scale_fill_manual(name = " ", 
+                               breaks = c("1", "2"), 
+                                values = c("#00A9FF","#F8766D"),
+                                 labels = c("Men", "Women"))+
+      
+   theme_bw()+    
+   theme(axis.ticks.x=element_blank(),
+         aspect.ratio=1,
+          axis.text=element_text(size=size),
+          axis.title=element_text(size=size_axis_title),
+          title=element_text(size=size_title),
+          legend.text=element_text(size=size_axis_title),
+          legend.key.size=unit(0.8,"cm"),
+          legend.position=c(0.8,0.95),
+          legend.background=element_blank())
+})
+
+
+output$histogram_historisch<- renderPlot({
+ggplot()+
+  geom_histogram(data=dataHistorisch(), aes(x=Height),alpha = 0.5,position="identity",color="darkgrey",fill = colorsex(),binwidth=1)+
+  geom_vline(aes(xintercept = input$Height),col="#32CD32",size=2,linetype="solid")+ 
+  xlab("Height in cm")+
+  ylab("Count") +
+  ggtitle("Histogram height 1940 - 1950") +  
+  # scale_linetype_manual(guide = guide_legend(override.aes = list(color = "white")))+
+  scale_fill_manual(name = " ", 
+                               breaks = c("1", "2"), 
+                                values = c("#00A9FF","#F8766D"),
+                                 labels = c("Men", "Women"))+
+      
+   theme_bw()+    
+   theme(axis.ticks.x=element_blank(),
+         aspect.ratio=1,
+          axis.text=element_text(size=size),
+          axis.title=element_text(size=size_axis_title),
+          title=element_text(size=size_title),
+          legend.text=element_text(size=size_axis_title),
+         legend.key.size=unit(1.5,"cm"))
+})
+
+heightPercentilModern <- reactive({
+ecdf_fun <- function(x,perc) ecdf(x)(perc)
+heightPercentilModern <- ecdf_fun(dataModern()$Height,input$Height)
+return(heightPercentilModern)
+})
+
+heightPercentilModernSmall <- reactive({
+heightPercentilModernSmall<- round(heightPercentilModern()*100)
+return(heightPercentilModernSmall)
+})
+
+heightPercentilModernLarge <- reactive({
+heightPercentilModernLarge<- round((1-heightPercentilModern())*100)
+return(heightPercentilModernLarge)
+})
+
+heightPercentilHistorisch <- reactive({
+ecdf_fun <- function(x,perc) ecdf(x)(perc)
+heightPercentilHistorisch <- ecdf_fun(dataHistorisch()$Height,input$Height)
+return(heightPercentilHistorisch)
+})
+
+heightPercentilHistorischSmall <- reactive({
+heightPercentilHistorischSmall<- round(heightPercentilHistorisch()*100)
+return(heightPercentilHistorischSmall)
+})
+
+heightPercentilHistorischLarge <- reactive({
+heightPercentilHistorischLarge<- round((1-heightPercentilHistorisch())*100)
+return(heightPercentilHistorischLarge)
+})
+
+output$textPercentile <- renderText({ 
+  paste("Today,","<font color=\"#32CD32\"><b>",heightPercentilModernSmall(),"</b></font>"," % of swiss",namesex(),"are shorter than you and","<font color=\"#32CD32\"><b>",heightPercentilModernLarge(),"</b></font>"," % are taller.",
+"<br>",
+"On average",namesex(),"are","<font color=\"#32CD32\"><b>",meanMod(),"</b></font>","cm tall.",
+        
+"<br>","<br>",
+        
+"In the 1940s,","<font color=\"#32CD32\"><b>",heightPercentilHistorischSmall(),"</b></font>"," % of swiss",namesex(),"were shorter than you and","<font color=\"#32CD32\"><b>",heightPercentilHistorischLarge(),"</b></font>","% were taller.",
+"<br>",
+"On average",namesex(),"were","<font color=\"#32CD32\"><b>",meanHist(),"</b></font>","cm tall."
+
+)
+})
+
+
+url <- a("Height in Switzerland",href="https://www.heighttool.uzh.ch/en/height-in-switzerland/height-and-its-impact.html",target="_blank")
+
+output$linkheight <- renderUI({
+      tagList("This illustrates the phenomenon of the secular increase in average height when people grew taller across the 19th and 20th century. Please find more information here:", url)
+    })
+  
+ output$textRef <- renderText({  
+  paste(
+    "<br>","<br>",
+    "<h6>", "Reference populations:","<br>",
+ "- Males: Students from the City of Zurich 2010-2015 and 1940-1950","<br>",
+  "- Females: Swiss Armed Forces volunteers 2004-2011 and 1940-1950",
+  "<br>","<br>",
+  "Sources:","<br>",
+"- Follows","<br>",
+"- Follows","<br>")
+  })
+
+}
+shinyApp(ui = ui, server = server,options = list(height = 1000,width=1400))  
+```
+
+
